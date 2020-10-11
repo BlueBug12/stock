@@ -69,13 +69,7 @@ class ml_model():
          batch=self.df.iloc[i-back:i]
          data_x.append(list(batch[feature].values[:]))
          data_y.append(self.df[feature][i+ahead-1])
-      '''
-      for i in range(7,len(self.df)-1):
-         batch=self.df.iloc[i-7:i]
-         data_x.append(list(batch[feature].values[:]))
-         data_y.append(self.df['high'][i])
-      print(data_y)
-      '''
+
       return data_x,data_y
 
    def write_model(self,filename,clf):
@@ -87,8 +81,6 @@ class ml_model():
    def train_model(self,feature,back,ahead=1,test_size=0.33,random_state=1,write=False):
       data_x,data_y = self.extract_training_data(feature,back,ahead)
       data_X,data_Y= shuffle(data_x,data_y, random_state=random_state)
-      #data_X = data_x
-      #data_Y = data_y
       train_x, test_x,train_y,test_y = train_test_split(data_X, data_Y, test_size=test_size, random_state=random_state)
       clf = Pipeline([
          ('scl', StandardScaler()),
@@ -103,5 +95,5 @@ class ml_model():
 
 
 if '__main__' == __name__:
-   m = ml_model("3008")
-   m.train_model(feature='high',back=7)
+   m = ml_model("2330")
+   m.train_model(feature='high',back=7,write=True)
