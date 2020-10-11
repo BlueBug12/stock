@@ -2,6 +2,7 @@ import pickle
 import re
 import os
 import json
+import sys
 import numpy as np
 import pandas as pd
 from sklearn.utils import shuffle
@@ -13,6 +14,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import GradientBoostingRegressor
 
 path = "/home/mlb/res/stock/twse/json/"
 regex = re.compile(r"[12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])")
@@ -67,7 +70,7 @@ class ml_model():
       
       for i in range(back,len(self.df)-(ahead)):
          batch=self.df.iloc[i-back:i]
-         data_x.append(list(batch[feature].values[:]))
+         data_x.append(list(batch[feature].values[:])+list(batch['volume'].values[:]))
          data_y.append(self.df[feature][i+ahead-1])
 
       return data_x,data_y
@@ -77,7 +80,8 @@ class ml_model():
          pickle.dump(clf,out_model)
    def test_model(self,test_x, test_y,clf):
       print(clf.score(test_x, test_y))
-      
+   def show(self):
+      print(self.df)
    def train_model(self,feature,back,ahead=1,test_size=0.33,random_state=1,write=False):
       data_x,data_y = self.extract_training_data(feature,back,ahead)
       data_X,data_Y= shuffle(data_x,data_y, random_state=random_state)
@@ -85,15 +89,21 @@ class ml_model():
       clf = Pipeline([
          ('scl', StandardScaler()),
          ('pca', PCA(n_components=5)),
-         ('clf', RandomForestRegressor(n_estimators=50))
+         #('clf',SVR())
+         ('clf',GradientBoostingRegressor())
+         
+         #('clf', RandomForestRegressor(n_estimators=1000,max_depth=8))
       ])
+
       clf.fit(train_x, train_y)
       print(clf.score(test_x, test_y))
+      print(mean_squared_error(clf.predict(test_x),test_y))
       #self.test_model(test_x, test_y,clf)
       if(write):
          self.write_model(f"{feature}_{str(back)}_{str(ahead)}_{self.stock_number}",clf)
 
 
 if '__main__' == __name__:
-   m = ml_model("2330")
-   m.train_model(feature='high',back=7,write=True)
+   m = ml_model(sys.argv[4])
+   m.train_model(feature=sys.argv[1],back=int(sys.argv[2]),ahead=int(sys.argv[3]),write=True)
+   #m.show()
