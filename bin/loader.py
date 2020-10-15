@@ -8,6 +8,63 @@ import pandas as pd
 import datetime
 path = "/home/mlb/res/stock/twse/json/"
 regex = re.compile(r"[12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])")
+
+def moving_average(data,period):
+    return data['close'].rolling(period).mean()
+def EMA(data,span):
+    return data['close'].ewm(span=span).mean()
+def MACD(data):
+    data['DIF'] = data['EMA_12'] - data['EMA_26']
+    data['DEM'] = data['DIF'].ewm(span=9).mean()
+    data['OSC'] = data['DIF'] - data['DEM']
+    return data
+def KD(data):
+    data_df = data.copy()
+    data_df['min'] = data_df['low'].rolling(9).min()
+    data_df['max'] = data_df['high'].rolling(9).max()
+    data_df['RSV'] = (data_df['close'] - data_df['min'])/(data_df['max'] - data_df['min'])
+    data_df = data_df.dropna()
+    # 計算K
+    # K的初始值定為50
+    K_list = [50]
+    for num,rsv in enumerate(list(data_df['RSV'])):
+        K_yestarday = K_list[num]
+        K_today = 2/3 * K_yestarday + 1/3 * rsv
+        K_list.append(K_today)
+    data_df['K'] = K_list[1:]
+    # 計算D
+    # D的初始值定為50
+    D_list = [50]
+    for num,K in enumerate(list(data_df['K'])):
+        D_yestarday = D_list[num]
+        D_today = 2/3 * D_yestarday + 1/3 * K
+        D_list.append(D_today)
+    data_df['D'] = D_list[1:]
+    use_df = pd.merge(data,data_df[['K','D']],left_index=True,right_index=True,how='left')
+    return use_df
+
+def RSI(data):
+    def cal_U(num):
+        if num >= 0:
+            return num
+        else:
+            return 0
+    def cal_D(num):
+        num = -num
+        return cal_U(num)
+    
+    data['Dif'] = data['close'].diff()
+    data['U'] = data['Dif'].apply(cal_U)
+    data['D'] = data['Dif'].apply(cal_D)
+    data['ema_U'] = data['U'].ewm(span=14).mean()
+    data['ema_D'] = data['D'].ewm(span=14).mean()
+    data['RS'] = data['ema_U'].div(data['ema_D'])
+    data['RSI'] = data['RS'].apply(lambda rs:rs/(1+rs) * 100)
+    return data['RSI']
+
+def OBV(data):
+    return (data['close']-data['low']).div(data['high']-data['low'])
+
 def check_null(info):
     for key, value in info.items(): #avoid null value
         if value=='NULL' or value=='':
@@ -32,12 +89,28 @@ def loader(stock_number,filename):
                   except KeyError:
                      print(f'Can not find the information of {stock_number}')
       if len(raw_data):
-         with open(filename+".pickle",'wb') as output:
+         with open(os.path.join(os.getcwd(),"data",f"{filename}.pickle",),'wb') as output:
             df = pd.DataFrame(raw_data).sort_values(by=['date'])
-            #df=df.drop(['adj_close'], axis=1)
             df[['adj_close','close','high','low','open']]=df[['adj_close','close','high','low','open']].astype('float64')
             df[['volume','date']]=df[['volume','date']].astype('int')
-            df=df.reset_index(drop=True)
+
+            #add technical analysis
+            df.drop(['date'],inplace=True, axis=1)
+            df = KD(df)
+            df['MA_5']=moving_average(df,5)
+            df['MA_10']=moving_average(df,10)
+            df['MA_20']=moving_average(df,20)
+            df['MA_60']=moving_average(df,60)
+            df['MA_240']=moving_average(df,240)
+            df['EMA_12']=EMA(df,12)
+            df['EMA_26']=EMA(df,26)
+            df = MACD(df)
+            df['RSI']=RSI(df)
+            df['OBV']=OBV(df)
+            #drop NaN and inf
+            df.replace([np.inf, -np.inf], np.nan,inplace=True)
+            df.dropna(inplace=True)
+            df.reset_index(drop=True,inplace=True)
             pickle.dump(df,output)
             print(f"End loading.")
       else:
