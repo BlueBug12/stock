@@ -116,5 +116,70 @@ def loader(stock_number,filename):
       else:
          print("Error: empty data can not generate output file.")
 
+def reloader(stock_number):
+      print(f"Start reload data of {stock_number} ...")
+      raw_data=[]
+      all_files=sorted(os.listdir(path))
+      with open(os.path.join(os.getcwd(),"data",f"{stock_number}.pickle"),'rb') as f:
+        df = pickle.load(f)
+      last_df=df.iloc[-1]
+      last_name=f"{str(int(last_df['year']))}-{str(int(last_df['month']))}-{str(int(last_df['day']))}.json"
+
+      for name in reversed(all_files):
+        if(name!=last_name):
+            
+            with open(os.path.join(path,name)) as f:
+                print(name)
+                try:
+                     s=json.load(f)[stock_number]
+                     if(check_null(s)):
+                        s['date'] = ''.join(name[0:10].split('-'))
+                        s['year'] = int(name[0:4])
+                        s['month'] = int(name[5:7])
+                        s['day'] = int(name[8:10])
+                        s['week'] = datetime.datetime(s['year'], s['month'], s['day']).weekday()
+
+                        raw_data.append(s)
+                except KeyError:
+                     print(f'Can not find the information of {stock_number}')
+        else:
+            break
+      if len(raw_data):
+         with open(os.path.join(os.getcwd(),"data",f"{stock_number}.pickle",),'wb') as output:
+            new_df = pd.DataFrame(raw_data).sort_values(by=['date'])
+            new_df[['adj_close','close','high','low','open']]=new_df[['adj_close','close','high','low','open']].astype('float64')
+            new_df[['volume','date']]=new_df[['volume','date']].astype('int')
+
+            #add technical analysis
+            new_df.drop(['date'],inplace=True, axis=1)
+            print(new_df)
+            print(len(df))
+            df=df.append(new_df,ignore_index=True)
+            print(len(df))
+            df = KD(df)
+            df['MA_5']=moving_average(df,5)
+            df['MA_10']=moving_average(df,10)
+            df['MA_20']=moving_average(df,20)
+            df['MA_60']=moving_average(df,60)
+            df['MA_240']=moving_average(df,240)
+            df['EMA_12']=EMA(df,12)
+            df['EMA_26']=EMA(df,26)
+            df = MACD(df)
+            df['RSI']=RSI(df)
+            df['OBV']=OBV(df)
+            #drop NaN and inf
+            df.replace([np.inf, -np.inf], np.nan,inplace=True)
+            df.dropna(inplace=True)
+            df.reset_index(drop=True,inplace=True)
+            #print(df.iloc[-1])
+            pickle.dump(df,output)
+            print(f"End reloading.")
+      else:
+          print(f"Nothing to update for {stock_number}")
+
 if '__main__' == __name__:
-   loader(sys.argv[1],sys.argv[1])
+
+    if(os.path.isfile(os.path.join(os.getcwd(),"data",f'{sys.argv[1]}.pickle'))):
+        reloader(sys.argv[1])
+    else:  
+        loader(sys.argv[1],sys.argv[1])
