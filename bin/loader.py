@@ -154,6 +154,7 @@ def reloader(stock_number):
             new_df.drop(['date'],inplace=True, axis=1)
             print(new_df)
             print(len(df))
+            df.drop(['K','D'],inplace=True,axis=1)
             df=df.append(new_df,ignore_index=True)
             print(len(df))
             df = KD(df)

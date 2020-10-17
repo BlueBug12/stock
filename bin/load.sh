@@ -1,10 +1,10 @@
 if [ "$#" -eq 0 ]
 then
-    python3 loader.py 2330
-    python3 loader.py 2454
-    python3 loader.py 3008
-    python3 loader.py 2308
-    python3 loader.py 2303
+  targets=( '2330' '0050' '2303' '2449' '2886' '3008' '1301' '2308' '2344' '2454' '2891' '3034' '1444' '2603' '2449' '2353' '2368')
+  for stock in "${targets[@]}"
+  do
+    python3 loader.py "$stock"
+  done
 else
   for var in "$@"
   do
