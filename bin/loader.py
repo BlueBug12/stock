@@ -41,6 +41,7 @@ def KD(data):
         D_list.append(D_today)
     data_df['D'] = D_list[1:]
     use_df = pd.merge(data,data_df[['K','D']],left_index=True,right_index=True,how='left')
+    use_df['3K-2D'] = 3*use_df['K']-2*use_df['D']
     return use_df
 
 def RSI(data):
@@ -54,10 +55,10 @@ def RSI(data):
         return cal_U(num)
     
     data['Dif'] = data['close'].diff()
-    data['U'] = data['Dif'].apply(cal_U)
-    data['D'] = data['Dif'].apply(cal_D)
-    data['ema_U'] = data['U'].ewm(span=14).mean()
-    data['ema_D'] = data['D'].ewm(span=14).mean()
+    data['cal_U'] = data['Dif'].apply(cal_U)
+    data['cal_D'] = data['Dif'].apply(cal_D)
+    data['ema_U'] = data['cal_U'].ewm(span=14).mean()
+    data['ema_D'] = data['cal_D'].ewm(span=14).mean()
     data['RS'] = data['ema_U'].div(data['ema_D'])
     data['RSI'] = data['RS'].apply(lambda rs:rs/(1+rs) * 100)
     return data['RSI']
@@ -100,8 +101,13 @@ def loader(stock_number,filename):
             df['MA_5']=moving_average(df,5)
             df['MA_10']=moving_average(df,10)
             df['MA_20']=moving_average(df,20)
-            df['MA_60']=moving_average(df,60)
-            df['MA_240']=moving_average(df,240)
+            df['MA_30']=moving_average(df,30)
+            df['MA_5-10'] = df['MA_5']-df['MA_10']
+            df['MA_5-20'] = df['MA_5']-df['MA_20']
+            df['MA_5-30'] = df['MA_5']-df['MA_30']
+            df['MA_10-20'] = df['MA_10']-df['MA_20']
+            df['MA_10-30'] = df['MA_10']-df['MA_30']
+            df['MA_20-30'] = df['MA_20']-df['MA_30']
             df['EMA_12']=EMA(df,12)
             df['EMA_26']=EMA(df,26)
             df = MACD(df)
@@ -124,10 +130,9 @@ def reloader(stock_number):
         df = pickle.load(f)
       last_df=df.iloc[-1]
       last_name=f"{str(int(last_df['year']))}-{str(int(last_df['month']))}-{str(int(last_df['day']))}.json"
-
+      print('last name:',last_name)
       for name in reversed(all_files):
         if(name!=last_name):
-            
             with open(os.path.join(path,name)) as f:
                 print(name)
                 try:
@@ -152,22 +157,29 @@ def reloader(stock_number):
 
             #add technical analysis
             new_df.drop(['date'],inplace=True, axis=1)
-            print(new_df)
-            print(len(df))
-            df.drop(['K','D'],inplace=True,axis=1)
-            df=df.append(new_df,ignore_index=True)
-            print(len(df))
+            #print(new_df)
+            #df.drop(['K','D'],inplace=True,axis=1)
+            df = df[['adj_close','close','high','low','open','volume']]
+            df=df.append(new_df,ignore_index=True,sort=False)
+
+            #print(len(df))
             df = KD(df)
             df['MA_5']=moving_average(df,5)
             df['MA_10']=moving_average(df,10)
             df['MA_20']=moving_average(df,20)
-            df['MA_60']=moving_average(df,60)
-            df['MA_240']=moving_average(df,240)
+            df['MA_30']=moving_average(df,30)
+            df['MA_5-10'] = df['MA_5']-df['MA_10']
+            df['MA_5-20'] = df['MA_5']-df['MA_20']
+            df['MA_5-30'] = df['MA_5']-df['MA_30']
+            df['MA_10-20'] = df['MA_10']-df['MA_20']
+            df['MA_10-30'] = df['MA_10']-df['MA_30']
+            df['MA_20-30'] = df['MA_20']-df['MA_30']
             df['EMA_12']=EMA(df,12)
             df['EMA_26']=EMA(df,26)
             df = MACD(df)
             df['RSI']=RSI(df)
             df['OBV']=OBV(df)
+
             #drop NaN and inf
             df.replace([np.inf, -np.inf], np.nan,inplace=True)
             df.dropna(inplace=True)
